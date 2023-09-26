@@ -16,7 +16,7 @@ HAT_MODEL_URL = "https://huggingface.co/datasets/dputilov/TTL/resolve/main/Real_
 device_hat = devices.get_device_for('hat')
 
 
-class UpscalerSwinIR(Upscaler):
+class UpscalerHAT(Upscaler):
     def __init__(self, dirname):
         self._cached_model = None           # keep the model when SWIN_torch_compile is on to prevent re-compile every runs
         self._cached_model_config = None    # to clear '_cached_model' when changing model (v1/v2) or settings
@@ -50,7 +50,7 @@ class UpscalerSwinIR(Upscaler):
             except Exception as e:
                 print(f"Failed loading HAT model {model_file}: {e}", file=sys.stderr)
                 return img
-            model = model.to(device_swinir, dtype=devices.dtype)
+            model = model.to(device_hat, dtype=devices.dtype)
             if use_compile:
                 model = torch.compile(model)
                 self._cached_model = model
@@ -68,8 +68,11 @@ class UpscalerSwinIR(Upscaler):
             )
         else:
             filename = path
-            
+
+        pretrained_model = torch.load(filename)
+        
         model = HAT(
+                state_dict=pretrained_model,
                 upscale=scale,
                 in_chans=3,
                 img_size=64,
@@ -82,13 +85,11 @@ class UpscalerSwinIR(Upscaler):
                 upsampler="nearest+conv",
                 resi_connection="3conv",
             )
-        params = "params_ema"
-
-        pretrained_model = torch.load(filename)
-        if params is not None:
-            model.load_state_dict(pretrained_model[params], strict=True)
-        else:
-            model.load_state_dict(pretrained_model, strict=True)
+        #params = "params_ema"
+        #if params is not None:
+        #    model.load_state_dict(pretrained_model[params], strict=True)
+        #else:
+        #    model.load_state_dict(pretrained_model, strict=True)
         return model
 
 
