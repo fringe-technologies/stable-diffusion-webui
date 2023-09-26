@@ -100,7 +100,7 @@ def upscale_without_tiling(model, img):
     return Image.fromarray(output, 'RGB')
 
 
-def upscale(model, img):
+def upscale(img, model):
     if opts.HAT_tile == 0:
         return upscale_without_tiling(model, img)
 
