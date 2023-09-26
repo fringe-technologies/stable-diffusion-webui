@@ -7,8 +7,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from einops import rearrange
 
-from .timm.helpers import to_2tuple
-from .timm.weight_init import trunc_normal_
+from extensions-builtin.HAT.timm.helpers import to_2tuple
+from extensions-builtin.HAT.timm.weight_init import trunc_normal_
 
 
 def drop_path(x, drop_prob: float = 0.0, training: bool = False):
