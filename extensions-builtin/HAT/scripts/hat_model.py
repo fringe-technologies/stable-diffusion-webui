@@ -89,7 +89,7 @@ def upscale_without_tiling(model, img):
     img = np.array(img)
     img = img[:, :, ::-1]
     img = np.ascontiguousarray(np.transpose(img, (2, 0, 1))) / 255
-    img = torch.from_numpy(img).float()
+    img = torch.from_numpy(img)
     img = img.unsqueeze(0).to(device_hat).half()
     with torch.no_grad():
         output = model(img)
