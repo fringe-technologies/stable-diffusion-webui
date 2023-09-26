@@ -77,13 +77,7 @@ class UpscalerHAT(Upscaler):
                 in_chans=3,
                 img_size=64,
                 window_size=8,
-                img_range=1.0,
-                depths=[6, 6, 6, 6, 6, 6, 6, 6, 6],
-                embed_dim=240,
-                num_heads=[8, 8, 8, 8, 8, 8, 8, 8, 8],
-                mlp_ratio=2,
-                upsampler="nearest+conv",
-                resi_connection="3conv",
+                img_range=1.0
             )
         #params = "params_ema"
         #if params is not None:
