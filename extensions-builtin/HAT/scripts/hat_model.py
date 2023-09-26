@@ -5,7 +5,7 @@ import numpy as np
 import torch
 from PIL import Image
 from tqdm import tqdm
-
+from torch import Tensor
 from modules import modelloader, devices, script_callbacks, shared, images
 from modules.shared import opts, state
 from hat_model_arch import HAT
