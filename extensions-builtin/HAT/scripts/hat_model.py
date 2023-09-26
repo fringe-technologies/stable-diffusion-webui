@@ -69,21 +69,27 @@ class UpscalerHAT(Upscaler):
         else:
             filename = path
 
-        pretrained_model = torch.load(filename)
+        state_dict = torch.load(filename)
         
+        state_dict_keys = list(state_dict.keys())
+
+        if "params_ema" in state_dict_keys:
+            state_dict = state_dict["params_ema"]
+        elif "params-ema" in state_dict_keys:
+            state_dict = state_dict["params-ema"]
+        elif "params" in state_dict_keys:
+            state_dict = state_dict["params"]
+        
+        print(state_dict_keys)
         model = HAT(
-                state_dict=pretrained_model["params_ema"],
+                state_dict=state_dict,
                 upscale=scale,
                 in_chans=3,
                 img_size=64,
                 window_size=8,
                 img_range=1.0
             )
-        #params = "params_ema"
-        #if params is not None:
-        #    model.load_state_dict(pretrained_model[params], strict=True)
-        #else:
-        #    model.load_state_dict(pretrained_model, strict=True)
+
         return model
 
 
