@@ -50,7 +50,7 @@ class UpscalerHAT(Upscaler):
             except Exception as e:
                 print(f"Failed loading HAT model {model_file}: {e}", file=sys.stderr)
                 return img
-            model = model.to(device_hat, dtype=devices.dtype)
+            model = model.to(device_hat, dtype=devices.dtype).half()
             if use_compile:
                 model = torch.compile(model)
                 self._cached_model = model
@@ -80,7 +80,7 @@ class UpscalerHAT(Upscaler):
         elif "params" in state_dict_keys:
             state_dict = state_dict["params"]
         
-        model = HAT(state_dict=state_dict)
+        model = HAT(state_dict=state_dict)   
 
         return model
 
