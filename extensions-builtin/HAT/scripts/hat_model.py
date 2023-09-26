@@ -72,7 +72,7 @@ class UpscalerHAT(Upscaler):
         pretrained_model = torch.load(filename)
         
         model = HAT(
-                state_dict=pretrained_model,
+                state_dict=pretrained_model["params_ema"],
                 upscale=scale,
                 in_chans=3,
                 img_size=64,
