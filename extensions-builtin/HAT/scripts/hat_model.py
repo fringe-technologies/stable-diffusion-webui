@@ -80,88 +80,47 @@ class UpscalerHAT(Upscaler):
         elif "params" in state_dict_keys:
             state_dict = state_dict["params"]
         
-        print(state_dict_keys)
-        model = HAT(
-                state_dict=state_dict,
-                upscale=scale,
-                in_chans=3,
-                img_size=64,
-                window_size=8,
-                img_range=1.0
-            )
+        model = HAT(state_dict=state_dict)
 
         return model
 
 
-def upscale(
-        img,
-        model,
-        tile=None,
-        tile_overlap=None,
-        window_size=8,
-        scale=4,
-):
-    tile = tile or opts.HAT_tile
-    tile_overlap = tile_overlap or opts.HAT_tile_overlap
-
-
+def upscale_without_tiling(model, img):
     img = np.array(img)
     img = img[:, :, ::-1]
-    img = np.moveaxis(img, 2, 0) / 255
+    img = np.ascontiguousarray(np.transpose(img, (2, 0, 1))) / 255
     img = torch.from_numpy(img).float()
-    img = img.unsqueeze(0).to(device_hat, dtype=devices.dtype)
-    with torch.no_grad(), devices.autocast():
-        _, _, h_old, w_old = img.size()
-        h_pad = (h_old // window_size + 1) * window_size - h_old
-        w_pad = (w_old // window_size + 1) * window_size - w_old
-        img = torch.cat([img, torch.flip(img, [2])], 2)[:, :, : h_old + h_pad, :]
-        img = torch.cat([img, torch.flip(img, [3])], 3)[:, :, :, : w_old + w_pad]
-        output = inference(img, model, tile, tile_overlap, window_size, scale)
-        output = output[..., : h_old * scale, : w_old * scale]
-        output = output.data.squeeze().float().cpu().clamp_(0, 1).numpy()
-        if output.ndim == 3:
-            output = np.transpose(
-                output[[2, 1, 0], :, :], (1, 2, 0)
-            )  # CHW-RGB to HCW-BGR
-        output = (output * 255.0).round().astype(np.uint8)  # float32 to uint8
-        return Image.fromarray(output, "RGB")
+    img = img.unsqueeze(0).to(devices.device_hat)
+    with torch.no_grad():
+        output = model(img)
+    output = output.squeeze().float().cpu().clamp_(0, 1).numpy()
+    output = 255. * np.moveaxis(output, 0, 2)
+    output = output.astype(np.uint8)
+    output = output[:, :, ::-1]
+    return Image.fromarray(output, 'RGB')
 
 
-def inference(img, model, tile, tile_overlap, window_size, scale):
-    # test the image tile by tile
-    b, c, h, w = img.size()
-    tile = min(tile, h, w)
-    assert tile % window_size == 0, "tile size should be a multiple of window_size"
-    sf = scale
+def upscale(model, img):
+    if opts.HAT_tile == 0:
+        return upscale_without_tiling(model, img)
 
-    stride = tile - tile_overlap
-    h_idx_list = list(range(0, h - tile, stride)) + [h - tile]
-    w_idx_list = list(range(0, w - tile, stride)) + [w - tile]
-    E = torch.zeros(b, c, h * sf, w * sf, dtype=devices.dtype, device=device_hat).type_as(img)
-    W = torch.zeros_like(E, dtype=devices.dtype, device=device_hat)
+    grid = images.split_grid(img, opts.HAT_tile, opts.HAT_tile, opts.HAT_tile_overlap)
+    newtiles = []
+    scale_factor = 1
 
-    with tqdm(total=len(h_idx_list) * len(w_idx_list), desc="HAT tiles") as pbar:
-        for h_idx in h_idx_list:
-            if state.interrupted or state.skipped:
-                break
+    for y, h, row in grid.tiles:
+        newrow = []
+        for tiledata in row:
+            x, w, tile = tiledata
 
-            for w_idx in w_idx_list:
-                if state.interrupted or state.skipped:
-                    break
+            output = upscale_without_tiling(model, tile)
+            scale_factor = output.width // tile.width
 
-                in_patch = img[..., h_idx: h_idx + tile, w_idx: w_idx + tile]
-                out_patch = model(in_patch)
-                out_patch_mask = torch.ones_like(out_patch)
+            newrow.append([x * scale_factor, w * scale_factor, output])
+        newtiles.append([y * scale_factor, h * scale_factor, newrow])
 
-                E[
-                ..., h_idx * sf: (h_idx + tile) * sf, w_idx * sf: (w_idx + tile) * sf
-                ].add_(out_patch)
-                W[
-                ..., h_idx * sf: (h_idx + tile) * sf, w_idx * sf: (w_idx + tile) * sf
-                ].add_(out_patch_mask)
-                pbar.update(1)
-    output = E.div_(W)
-
+    newgrid = images.Grid(newtiles, grid.tile_w * scale_factor, grid.tile_h * scale_factor, grid.image_w * scale_factor, grid.image_h * scale_factor, grid.overlap * scale_factor)
+    output = images.combine_grid(newgrid)
     return output
 
 
