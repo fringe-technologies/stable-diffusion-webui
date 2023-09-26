@@ -6,7 +6,7 @@ import torch
 from PIL import Image
 from tqdm import tqdm
 
-from modules import modelloader, devices, script_callbacks, shared
+from modules import modelloader, devices, script_callbacks, shared, images
 from modules.shared import opts, state
 from hat_model_arch import HAT
 from modules.upscaler import Upscaler, UpscalerData
