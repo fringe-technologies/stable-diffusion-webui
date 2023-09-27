@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from typing import Dict
 
-from sanic.log import logger
-
 SettingsJson = Dict[str, object]
 JsonExecutionOptions = Dict[str, SettingsJson]
 
@@ -14,8 +12,6 @@ class ExecutionOptions:
         backend_settings: JsonExecutionOptions,
     ) -> None:
         self.__settings = backend_settings
-
-        logger.info(f"Execution options: {self.__settings}")
 
     @staticmethod
     def parse(json: JsonExecutionOptions) -> ExecutionOptions:

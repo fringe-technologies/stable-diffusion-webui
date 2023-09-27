@@ -2,7 +2,6 @@ from dataclasses import dataclass, field
 from typing import Callable, Dict, Generic, Iterable, List, Set, Tuple, TypeVar, Union
 
 import numpy as np
-from sanic.log import logger
 
 from .convert_data import color_spaces, color_spaces_or_detectors, conversions
 from .convert_model import (
@@ -110,10 +109,6 @@ def convert(
 
     if path is None:
         raise ValueError(f"Conversion {input_.name} -> {output.name} is not possible.")
-
-    logger.debug(
-        f"Converting color using the path {' -> '.join(map(lambda x: x.name, path))}"
-    )
 
     for i in range(1, len(path)):
         curr_in = path[i - 1]

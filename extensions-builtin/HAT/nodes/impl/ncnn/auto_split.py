@@ -12,7 +12,6 @@ except ImportError:
     from ncnn import ncnn
 
     use_gpu = False
-from sanic.log import logger
 
 from ...utils.utils import get_h_w_c
 from ..image_utils import to_uint8
@@ -79,7 +78,6 @@ def ncnn_auto_split(
             # Check to see if its actually the NCNN out of memory error
             if "failed" in str(e):
                 # clear VRAM
-                logger.debug(f"NCNN out of VRAM, clearing VRAM and splitting.")
                 ex = None
                 del ex
                 gc.collect()

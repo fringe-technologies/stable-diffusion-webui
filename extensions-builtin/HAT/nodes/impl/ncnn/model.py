@@ -5,7 +5,6 @@ from json import load as jload
 from typing import Dict, List, Tuple, Union
 
 import numpy as np
-from sanic.log import logger
 
 from ...utils.checked_cast import checked_cast
 
@@ -200,7 +199,6 @@ class NcnnParamCollection:
             try:
                 param = param_dict[idstr]
             except KeyError:
-                logger.error(f"Op {self.op} does not have param {pid}, please report")
                 raise
 
             defaultValue = param["defaultValue"]
@@ -229,7 +227,6 @@ class NcnnParamCollection:
         try:
             param = param_dict[idstr]
         except KeyError:
-            logger.error(f"Op {self.op} does not have param {idstr}, please report")
             raise
         name = param["paramPhase"]
         def_val = param["defaultValue"]
@@ -413,9 +410,6 @@ class NcnnModel:
                 try:
                     weight_b = weights_b[weight_name]
                 except KeyError:
-                    logger.error(
-                        f"Weights in node {a.name} and {b.name} do not correspond"
-                    )
                     raise
 
                 assert (

@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from typing import List, Tuple, Union
 
 import numpy as np
-from sanic.log import logger
 
 Size = Tuple[int, int]
 """
@@ -94,7 +93,7 @@ def split_file_path(path: str) -> Tuple[str, str, str]:
 
 
 def walk_error_handler(exception_instance):
-    logger.warning(
+    print(
         f"Exception occurred during walk: {exception_instance} Continuing..."
     )
 

@@ -1,7 +1,6 @@
 from typing import Callable, NewType
 
 import numpy as np
-from sanic.log import logger
 
 from ...utils.utils import get_h_w_c
 from .tiler import MaxTileSize, NoTiling, Tiler
@@ -24,7 +23,7 @@ def estimate_tile_size(
     GB_AMT = 1024**3
     required_mem = f"{mem_required_estimation/GB_AMT:.2f}"
     budget_mem = f"{budget/GB_AMT:.2f}"
-    logger.info(
+    print(
         f"Estimating memory required: {required_mem} GB, {budget_mem} GB free."
         f" Estimated tile size: {tile_size}"
     )

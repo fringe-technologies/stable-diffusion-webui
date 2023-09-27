@@ -4,7 +4,6 @@ import math
 from typing import Callable, Optional, Union
 
 import numpy as np
-from sanic.log import logger
 
 from ...utils.utils import Region, Size, get_h_w_c
 from .exact_split import exact_split
@@ -62,7 +61,7 @@ def _exact_split(
     overlap: int,
 ) -> np.ndarray:
     h, w, c = get_h_w_c(img)
-    logger.info(
+    print(
         f"Exact size split image ({w}x{h}px @ {c}) with exact tile size {starting_tile_size[0]}x{starting_tile_size[1]}px."
     )
 
@@ -106,7 +105,7 @@ def _max_split(
     img_region = Region(0, 0, w, h)
 
     max_tile_size = starting_tile_size
-    logger.info(
+    print(
         f"Auto split image ({w}x{h}px @ {c}) with initial tile size {max_tile_size}."
     )
 
@@ -119,7 +118,7 @@ def _max_split(
         # the image was too large
         max_tile_size = split_tile_size(max_tile_size)
 
-        logger.info(
+        print(
             f"Unable to upscale the whole image at once. Reduced tile size to {max_tile_size}."
         )
 
@@ -149,7 +148,7 @@ def _max_split(
         tile_size_x = math.ceil(w / tile_count_x)
         tile_size_y = math.ceil(h / tile_count_y)
 
-        logger.info(
+        print(
             f"Currently {tile_count_x}x{tile_count_y} tiles each {tile_size_x}x{tile_size_y}px."
         )
 
@@ -181,7 +180,7 @@ def _max_split(
                     start_x = (x * tile_size_x) // new_tile_size_x
                     start_y = (y * tile_size_x) // new_tile_size_y
 
-                    logger.info(
+                    print(
                         f"Split occurred. New tile size is {max_tile_size}. Starting at {start_x},{start_y}."
                     )
 
