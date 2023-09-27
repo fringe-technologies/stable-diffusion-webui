@@ -254,16 +254,16 @@ def upscale_without_tiling(model, img):
     d_img = None
     try:
         d_img = img_tensor.to(device_hat, dtype=devices.dtype)
+        with torch.no_grad(), devices.autocast():
+            result = model(d_img)
+            result = tensor2np(
+                result.detach().cpu().detach(),
+                change_range=False,
+                imtype=np.float32,
+            )
 
-        result = model(d_img)
-        result = tensor2np(
-            result.detach().cpu().detach(),
-            change_range=False,
-            imtype=np.float32,
-        )
-
-        del d_img
-        return Image.fromarray(result, 'RGB')
+            del d_img
+            return Image.fromarray(result, 'RGB')
     except RuntimeError as e:
         # Check to see if its actually the CUDA out of memory error
         if "allocate" in str(e) or "CUDA" in str(e):
