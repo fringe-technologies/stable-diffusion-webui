@@ -70,7 +70,7 @@ class UpscalerHAT(Upscaler):
             except Exception as e:
                 print(f"Failed loading HAT model {model_file}: {e}", file=sys.stderr)
                 return img
-            model = model.to(device_hat, dtype=devices.dtype).half()
+            model = model.to(device_hat, dtype=devices.dtype)
             if use_compile:
                 model = torch.compile(model)
                 self._cached_model = model
@@ -252,8 +252,8 @@ def upscale_without_tiling(model, img):
 
     d_img = None
     try:
-        d_img = img_tensor.to(device_hat)
-        d_img = d_img.half()
+        d_img = img_tensor.to(device_hat, dtype=devices.dtype)
+        d_img = d_img.float()
 
         result = model(d_img)
         result = tensor2np(
