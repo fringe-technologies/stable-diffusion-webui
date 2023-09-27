@@ -11,16 +11,11 @@ from ..onnx.np_tensor_utils import MAX_VALUES_BY_DTYPE, np_denorm
 
 
 def bgr_to_rgb(image: Tensor) -> Tensor:
-    # flip image channels
-    # https://github.com/pytorch/pytorch/issues/229
     out: Tensor = image.flip(-3)
-    # RGB to BGR #may be faster:
-    # out: Tensor = image[[2, 1, 0], :, :]
     return out
 
 
 def rgb_to_bgr(image: Tensor) -> Tensor:
-    # same operation as bgr_to_rgb(), flip image channels
     return bgr_to_rgb(image)
 
 
@@ -30,7 +25,6 @@ def bgra_to_rgba(image: Tensor) -> Tensor:
 
 
 def rgba_to_bgra(image: Tensor) -> Tensor:
-    # same operation as bgra_to_rgba(), flip image channels
     return bgra_to_rgba(image)
 
 

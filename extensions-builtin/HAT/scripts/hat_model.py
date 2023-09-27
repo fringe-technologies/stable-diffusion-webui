@@ -182,7 +182,6 @@ def upscale(
                 )
             return MaxTileSize()
 
-        # Disable tiling for SCUNet
         upscale_tile_size = shared.opts.HAT_tile
         img = np.array(img)
         print(img.shape)
