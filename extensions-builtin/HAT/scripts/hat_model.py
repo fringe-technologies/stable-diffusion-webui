@@ -1,3 +1,4 @@
+import gc
 import sys
 import platform
 
@@ -17,6 +18,11 @@ HAT_MODEL_URL = "https://huggingface.co/datasets/dputilov/TTL/resolve/main/Real_
 
 device_hat = devices.get_device_for('hat')
 
+
+class Split:
+    pass
+
+
 MAX_VALUES_BY_DTYPE = {
     np.dtype("int8").name: 127,
     np.dtype("uint8").name: 255,
@@ -32,8 +38,8 @@ MAX_VALUES_BY_DTYPE = {
 
 class UpscalerHAT(Upscaler):
     def __init__(self, dirname):
-        self._cached_model = None           # keep the model when SWIN_torch_compile is on to prevent re-compile every runs
-        self._cached_model_config = None    # to clear '_cached_model' when changing model (v1/v2) or settings
+        self._cached_model = None
+        self._cached_model_config = None
         self.name = "HAT"
         self.model_url = HAT_MODEL_URL
         self.model_name = "HAT 4x"
@@ -118,18 +124,14 @@ def as_3d(img: np.ndarray) -> np.ndarray:
     if img.ndim == 2:
         return np.expand_dims(img.copy(), axis=2)
     return img
-    
+
+
 def bgr_to_rgb(image: Tensor) -> Tensor:
-    # flip image channels
-    # https://github.com/pytorch/pytorch/issues/229
     out: Tensor = image.flip(-3)
-    # RGB to BGR #may be faster:
-    # out: Tensor = image[[2, 1, 0], :, :]
     return out
 
 
 def rgb_to_bgr(image: Tensor) -> Tensor:
-    # same operation as bgr_to_rgb(), flip image channels
     return bgr_to_rgb(image)
 
 
@@ -139,7 +141,6 @@ def bgra_to_rgba(image: Tensor) -> Tensor:
 
 
 def rgba_to_bgra(image: Tensor) -> Tensor:
-    # same operation as bgra_to_rgba(), flip image channels
     return bgra_to_rgba(image)
 
 
@@ -152,7 +153,6 @@ def norm(x: Tensor):
 def np2tensor(
     img: np.ndarray,
     bgr2rgb=True,
-    data_range=1.0,  # pylint: disable=unused-argument
     normalize=False,
     change_range=True,
     add_batch=True,
@@ -163,30 +163,21 @@ def np2tensor(
         add_batch (bool): choose if new tensor needs batch dimension added
     """
 
-    # check how many channels the image has, then condition. ie. RGB, RGBA, Gray
-    # if bgr2rgb:
-    #     img = img[
-    #         :, :, [2, 1, 0]
-    #     ]  # BGR to RGB -> in numpy, if using OpenCV, else not needed. Only if image has colors.
     if change_range:
         dtype = img.dtype
         maxval = MAX_VALUES_BY_DTYPE.get(dtype.name, 1.0)
         t_dtype = np.dtype("float32")
         img = img.astype(t_dtype) / maxval  # ie: uint8 = /255
-    # "HWC to CHW" and "numpy to tensor"
+
     tensor = torch.from_numpy(
         np.ascontiguousarray(np.transpose(as_3d(img), (2, 0, 1)))
     ).float()
     if bgr2rgb:
-        # BGR to RGB -> in tensor, if using OpenCV, else not needed. Only if image has colors.)
         if tensor.shape[0] % 3 == 0:
-            # RGB or MultixRGB (3xRGB, 5xRGB, etc. For video tensors.)
             tensor = bgr_to_rgb(tensor)
         elif tensor.shape[0] == 4:
-            # RGBA
             tensor = bgra_to_rgba(tensor)
     if add_batch:
-        # Add fake batch dimension = 1 . squeeze() will remove the dimensions of size 1
         tensor.unsqueeze_(0)
     if normalize:
         tensor = norm(tensor)
@@ -215,27 +206,21 @@ def tensor2np(
     """
     n_dim = img.dim()
 
-    # TODO: Check: could denormalize here in tensor form instead, but end result is the same
-
     img = img.float().cpu()
 
     img_np: np.ndarray
 
     if n_dim in (4, 3):
-        # if n_dim == 4, has to convert to 3 dimensions
         if n_dim == 4 and remove_batch:
-            # remove a fake batch dimension
             img = img.squeeze(dim=0)
 
-        if img.shape[0] == 3 and rgb2bgr:  # RGB
-            # RGB to BGR -> in tensor, if using OpenCV, else not needed. Only if image has colors.
+        if img.shape[0] == 3 and rgb2bgr:
             img_np = rgb_to_bgr(img).numpy()
-        elif img.shape[0] == 4 and rgb2bgr:  # RGBA
-            # RGBA to BGRA -> in tensor, if using OpenCV, else not needed. Only if image has colors.
+        elif img.shape[0] == 4 and rgb2bgr:
             img_np = rgba_to_bgra(img).numpy()
         else:
             img_np = img.numpy()
-        img_np = np.transpose(img_np, (1, 2, 0))  # CHW to HWC
+        img_np = np.transpose(img_np, (1, 2, 0))
     elif n_dim == 2:
         img_np = img.numpy()
     else:
@@ -251,7 +236,15 @@ def tensor2np(
     # has to be in range (0,255) before changing to np.uint8, else np.float32
     return img_np.astype(imtype)
     
-    
+def safe_cuda_cache_empty():
+    """
+    Empties the CUDA cache if CUDA is available. Hopefully without causing any errors.
+    """
+    try:
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    except:
+        pass
     
 def upscale_without_tiling(model, img):
     img = np.array(img)
@@ -259,7 +252,7 @@ def upscale_without_tiling(model, img):
 
     d_img = None
     try:
-        d_img = img_tensor.to(device)
+        d_img = img_tensor.to(device_hat)
         d_img = d_img.half()
 
         result = model(d_img)
@@ -270,7 +263,7 @@ def upscale_without_tiling(model, img):
             )
 
         del d_img
-        return Image.fromarray(output, 'RGB')
+        return Image.fromarray(result, 'RGB')
     except RuntimeError as e:
             # Check to see if its actually the CUDA out of memory error
             if "allocate" in str(e) or "CUDA" in str(e):
