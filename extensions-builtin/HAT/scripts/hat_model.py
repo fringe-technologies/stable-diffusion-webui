@@ -145,6 +145,7 @@ def upscale(
         # Disable tiling for SCUNet
         upscale_tile_size = shared.opts.HAT_tile
         img = np.array(img)
+        img = img[:, :, ::-1]
         print(img.shape)
         img_out = pytorch_auto_split(
             img,
