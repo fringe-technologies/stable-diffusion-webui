@@ -1,4 +1,3 @@
-import gc
 import platform
 import sys
 from typing import Type, Tuple
@@ -15,16 +14,8 @@ from nodes.impl.upscale.auto_split_tiles import (
     estimate_tile_size,
     parse_tile_size_input,
 )
-from nodes.impl.upscale.convenient_upscale import convenient_upscale
 from nodes.impl.upscale.tiler import MaxTileSize
-from nodes.properties.inputs import (
-    BoolInput,
-    ImageInput,
-    SrModelInput,
-    TileSizeDropdown,
-)
-from nodes.properties.outputs import ImageOutput
-from nodes.utils.utils import get_h_w_c
+
 
 from modules import modelloader, devices, script_callbacks, shared, images
 from modules.shared import opts
