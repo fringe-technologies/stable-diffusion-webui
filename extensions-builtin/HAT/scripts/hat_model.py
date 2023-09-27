@@ -154,7 +154,7 @@ def upscale(
             tiler=parse_tile_size_input(upscale_tile_size, estimate),
         )
 
-        return Image.fromarray(img_out).convert('RGB')
+        return Image.fromarray((img_out).astype(np.uint8)).convert('RGB')
 
 
 def on_ui_settings():
