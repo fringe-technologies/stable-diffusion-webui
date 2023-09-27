@@ -116,6 +116,46 @@ class UpscalerHAT(Upscaler):
         return model
 
 
+def _get_iinfo(img: np.ndarray):
+    try:
+        return np.iinfo(img.dtype)
+    except:
+        return None
+
+
+def normalize(img: np.ndarray):
+    if img.dtype != np.float32:
+        info = _get_iinfo(img)
+        img = img.astype(np.float32)
+
+        if info is not None:
+            img /= info.max
+            if info.min == 0:
+                return img
+
+        return np.clip(img, 0, 1, out=img)
+
+    return np.clip(img, 0, 1)
+
+
+def to_uint8(
+    img: np.ndarray,
+    normalized=False,
+) -> np.ndarray:
+    """
+    Returns a new uint8 image with the given image data.
+
+    If `normalized` is `False`, then the image will be normalized before being converted to uint8.
+    """
+    if img.dtype == np.uint8:
+        return img.copy()
+
+    if not normalized or img.dtype != np.float32:
+        img = normalize(img)
+
+    return (img * 255).round().astype(np.uint8)
+
+
 def upscale(
     img,
     model
@@ -145,7 +185,6 @@ def upscale(
         # Disable tiling for SCUNet
         upscale_tile_size = shared.opts.HAT_tile
         img = np.array(img)
-        img = img[:, :, ::-1]
         print(img.shape)
         img_out = pytorch_auto_split(
             img,
@@ -155,7 +194,7 @@ def upscale(
             tiler=parse_tile_size_input(upscale_tile_size, estimate),
         )
 
-        return Image.fromarray((img_out * 255.0).round().astype(np.uint8)).convert('RGB')
+        return Image.fromarray(to_uint8(img_out)).convert('RGB')
 
 
 def on_ui_settings():
