@@ -17,6 +17,18 @@ HAT_MODEL_URL = "https://huggingface.co/datasets/dputilov/TTL/resolve/main/Real_
 
 device_hat = devices.get_device_for('hat')
 
+MAX_VALUES_BY_DTYPE = {
+    np.dtype("int8").name: 127,
+    np.dtype("uint8").name: 255,
+    np.dtype("int16").name: 32767,
+    np.dtype("uint16").name: 65535,
+    np.dtype("int32").name: 2147483647,
+    np.dtype("uint32").name: 4294967295,
+    np.dtype("int64").name: 9223372036854775807,
+    np.dtype("uint64").name: 18446744073709551615,
+    np.dtype("float32").name: 1.0,
+    np.dtype("float64").name: 1.0,
+}
 
 class UpscalerHAT(Upscaler):
     def __init__(self, dirname):
