@@ -1,13 +1,30 @@
 import gc
 import platform
 import sys
-from typing import Type
+from typing import Type, Tuple
 
 import numpy as np
 import torch
 from PIL import Image
 from hat_model_arch import HAT
 from torch import Tensor
+from nodes.impl.pytorch.auto_split import pytorch_auto_split
+from nodes.impl.upscale.auto_split_tiles import (
+    NO_TILING,
+    TileSize,
+    estimate_tile_size,
+    parse_tile_size_input,
+)
+from nodes.impl.upscale.convenient_upscale import convenient_upscale
+from nodes.impl.upscale.tiler import MaxTileSize
+from nodes.properties.inputs import (
+    BoolInput,
+    ImageInput,
+    SrModelInput,
+    TileSizeDropdown,
+)
+from nodes.properties.outputs import ImageOutput
+from nodes.utils.utils import get_h_w_c
 
 from modules import modelloader, devices, script_callbacks, shared, images
 from modules.shared import opts
@@ -16,25 +33,6 @@ from modules.upscaler import Upscaler, UpscalerData
 HAT_MODEL_URL = "https://huggingface.co/datasets/dputilov/TTL/resolve/main/Real_HAT_GAN_SRx4.pth"
 
 device_hat = devices.get_device_for('hat')
-
-
-class Split:
-    pass
-
-
-MAX_VALUES_BY_DTYPE = {
-    np.dtype("int8").name: 127,
-    np.dtype("uint8").name: 255,
-    np.dtype("int16").name: 32767,
-    np.dtype("uint16").name: 65535,
-    np.dtype("int32").name: 2147483647,
-    np.dtype("uint32").name: 4294967295,
-    np.dtype("int64").name: 9223372036854775807,
-    np.dtype("uint64").name: 18446744073709551615,
-    np.dtype("float32").name: 1.0,
-    np.dtype("float64").name: 1.0,
-}
-
 
 class UpscalerHAT(Upscaler):
     def __init__(self, dirname):
@@ -118,193 +116,44 @@ class UpscalerHAT(Upscaler):
         return model
 
 
-def as_3d(img: np.ndarray) -> np.ndarray:
-    """Given a grayscale image, this returns an image with 3 dimensions (image.ndim == 3)."""
-    if img.ndim == 2:
-        return np.expand_dims(img.copy(), axis=2)
-    return img
+def upscale(
+    img,
+    model
+):
+    with torch.no_grad():
+        use_fp16 = False
+        device = 'cuda'
 
+        def estimate():
+            if "cuda" in device.type:
+                mem_info: Tuple[int, int] = torch.cuda.mem_get_info(device)
+                free, _total = mem_info
+                element_size = 2 if use_fp16 else 4
+                model_bytes = sum(p.numel() * element_size for p in model.parameters())
+                budget = int(free * 0.8)
 
-def bgr_to_rgb(image: Tensor) -> Tensor:
-    out: Tensor = image.flip(-3)
-    return out
+                return MaxTileSize(
+                    estimate_tile_size(
+                        budget,
+                        model_bytes,
+                        img,
+                        element_size,
+                    )
+                )
+            return MaxTileSize()
 
+        # Disable tiling for SCUNet
+        upscale_tile_size = shared.opts.HAT_tile
 
-def rgb_to_bgr(image: Tensor) -> Tensor:
-    return bgr_to_rgb(image)
-
-
-def bgra_to_rgba(image: Tensor) -> Tensor:
-    out: Tensor = image[[2, 1, 0, 3], :, :]
-    return out
-
-
-def rgba_to_bgra(image: Tensor) -> Tensor:
-    return bgra_to_rgba(image)
-
-
-def norm(x: Tensor):
-    """Normalize (z-norm) from [0,1] range to [-1,1]"""
-    out = (x - 0.5) * 2.0
-    return out.clamp(-1, 1)
-
-
-def np2tensor(
-        img: np.ndarray,
-        bgr2rgb=True,
-        normalize=False,
-        change_range=True,
-        add_batch=True,
-) -> Tensor:
-    """Converts a numpy image array into a Tensor array.
-    Parameters:
-        img (numpy array): the input image numpy array
-        add_batch (bool): choose if new tensor needs batch dimension added
-    """
-
-    if change_range:
-        dtype = img.dtype
-        maxval = MAX_VALUES_BY_DTYPE.get(dtype.name, 1.0)
-        t_dtype = np.dtype("float32")
-        img = img.astype(t_dtype) / maxval  # ie: uint8 = /255
-
-    tensor = torch.from_numpy(
-        np.ascontiguousarray(np.transpose(as_3d(img), (2, 0, 1)))
-    ).float()
-    if bgr2rgb:
-        if tensor.shape[0] % 3 == 0:
-            tensor = bgr_to_rgb(tensor)
-        elif tensor.shape[0] == 4:
-            tensor = bgra_to_rgba(tensor)
-    if add_batch:
-        tensor.unsqueeze_(0)
-    if normalize:
-        tensor = norm(tensor)
-    return tensor
-
-
-def tensor2np(
-        img: Tensor,
-        rgb2bgr=True,
-        remove_batch=True,
-        data_range=255,
-        denormalize=False,
-        change_range=True,
-        imtype: Type = np.uint8,
-) -> np.ndarray:
-    """Converts a Tensor array into a numpy image array.
-    Parameters:
-        img (tensor): the input image tensor array
-            4D(B,(3/1),H,W), 3D(C,H,W), or 2D(H,W), any range, RGB channel order
-        remove_batch (bool): choose if tensor of shape BCHW needs to be squeezed
-        denormalize (bool): Used to denormalize from [-1,1] range back to [0,1]
-        imtype (type): the desired type of the converted numpy array (np.uint8
-            default)
-    Output:
-        img (np array): 3D(H,W,C) or 2D(H,W), [0,255], np.uint8 (default)
-    """
-    n_dim = img.dim()
-
-    img = img.float().cpu()
-
-    img_np: np.ndarray
-
-    if n_dim in (4, 3):
-        if n_dim == 4 and remove_batch:
-            img = img.squeeze(dim=0)
-
-        if img.shape[0] == 3 and rgb2bgr:
-            img_np = rgb_to_bgr(img).numpy()
-        elif img.shape[0] == 4 and rgb2bgr:
-            img_np = rgba_to_bgra(img).numpy()
-        else:
-            img_np = img.numpy()
-        img_np = np.transpose(img_np, (1, 2, 0))
-    elif n_dim == 2:
-        img_np = img.numpy()
-    else:
-        raise TypeError(
-            f"Only support 4D, 3D and 2D tensor. But received with dimension: {n_dim:d}"
+        img_out = pytorch_auto_split(
+            img,
+            model=model,
+            device=device,
+            use_fp16=use_fp16,
+            tiler=parse_tile_size_input(upscale_tile_size, estimate),
         )
 
-    if change_range:
-        img_np = np.clip(
-            data_range * img_np, 0, data_range
-        ).round()  # np.clip to the data_range
-
-    # has to be in range (0,255) before changing to np.uint8, else np.float32
-    return img_np.astype(imtype)
-
-
-def safe_cuda_cache_empty():
-    """
-    Empties the CUDA cache if CUDA is available. Hopefully without causing any errors.
-    """
-    try:
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-    except:
-        pass
-
-
-def upscale_without_tiling(model, img):
-    img = np.array(img)
-    img_tensor = np2tensor(img, change_range=True)
-
-    d_img = None
-    try:
-        d_img = img_tensor.to(device_hat, dtype=devices.dtype)
-        with torch.no_grad(), devices.autocast():
-            result = model(d_img)
-            result = tensor2np(
-                result.detach().cpu().detach(),
-                change_range=False,
-                imtype=np.float32,
-            )
-
-            del d_img
-            return Image.fromarray(result, 'RGB')
-    except RuntimeError as e:
-        # Check to see if its actually the CUDA out of memory error
-        if "allocate" in str(e) or "CUDA" in str(e):
-            # Collect garbage (clear VRAM)
-            if d_img is not None:
-                try:
-                    d_img.detach().cpu()
-                except:
-                    pass
-                del d_img
-            gc.collect()
-            safe_cuda_cache_empty()
-            return Split()
-        else:
-            # Re-raise the exception if not an OOM error
-            raise
-
-
-def upscale(img, model):
-    if shared.opts.HAT_tile == 0:
-        return upscale_without_tiling(model, img)
-
-    grid = images.split_grid(img, shared.opts.HAT_tile, shared.opts.HAT_tile, shared.opts.HAT_tile_overlap)
-    newtiles = []
-    scale_factor = 1
-
-    for y, h, row in grid.tiles:
-        newrow = []
-        for tiledata in row:
-            x, w, tile = tiledata
-
-            output = upscale_without_tiling(model, tile)
-            scale_factor = output.width // tile.width
-
-            newrow.append([x * scale_factor, w * scale_factor, output])
-        newtiles.append([y * scale_factor, h * scale_factor, newrow])
-
-    newgrid = images.Grid(newtiles, grid.tile_w * scale_factor, grid.tile_h * scale_factor, grid.image_w * scale_factor,
-                          grid.image_h * scale_factor, grid.overlap * scale_factor)
-    output = images.combine_grid(newgrid)
-    return output
+        return Image.fromarray(img_out).convert('RGB')
 
 
 def on_ui_settings():
