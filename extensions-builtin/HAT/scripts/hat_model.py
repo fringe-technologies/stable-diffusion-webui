@@ -11,6 +11,8 @@ from modules.shared import opts, state
 from hat_model_arch import HAT
 from modules.upscaler import Upscaler, UpscalerData
 
+from typing import Type
+
 HAT_MODEL_URL = "https://huggingface.co/datasets/dputilov/TTL/resolve/main/Real_HAT_GAN_SRx4.pth"
 
 device_hat = devices.get_device_for('hat')
@@ -80,7 +82,22 @@ class UpscalerHAT(Upscaler):
         elif "params" in state_dict_keys:
             state_dict = state_dict["params"]
         
-        model = HAT(state_dict=state_dict)   
+        model = HAT(state_dict=state_dict,
+                    upscale=4
+                    in_chans=3
+                    img_size=64
+                    window_size=16
+                    compress_ratio=3
+                    squeeze_factor=30
+                    conv_scale=0.01
+                    overlap_ratio=0.5
+                    img_range=1.
+                      depths=[6, 6, 6, 6, 6, 6]
+                      embed_dim=180
+                      num_heads=[6, 6, 6, 6, 6, 6]
+                      mlp_ratio=2
+                      upsampler='pixelshuffle'
+                      resi_connection='1conv')   
 
         return model
 
@@ -261,10 +278,10 @@ def upscale_without_tiling(model, img):
 
 
 def upscale(img, model):
-    if opts.HAT_tile == 0:
+    if shared.opts.HAT_tile == 0:
         return upscale_without_tiling(model, img)
 
-    grid = images.split_grid(img, opts.HAT_tile, opts.HAT_tile, opts.HAT_tile_overlap)
+    grid = images.split_grid(img, shared.opts.HAT_tile, shared.opts.HAT_tile, shared.opts.HAT_tile_overlap)
     newtiles = []
     scale_factor = 1
 
