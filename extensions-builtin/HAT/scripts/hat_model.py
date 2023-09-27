@@ -1,18 +1,17 @@
 import gc
-import sys
 import platform
+import sys
+from typing import Type
 
 import numpy as np
 import torch
 from PIL import Image
-from tqdm import tqdm
-from torch import Tensor
-from modules import modelloader, devices, script_callbacks, shared, images
-from modules.shared import opts, state
 from hat_model_arch import HAT
-from modules.upscaler import Upscaler, UpscalerData
+from torch import Tensor
 
-from typing import Type
+from modules import modelloader, devices, script_callbacks, shared, images
+from modules.shared import opts
+from modules.upscaler import Upscaler, UpscalerData
 
 HAT_MODEL_URL = "https://huggingface.co/datasets/dputilov/TTL/resolve/main/Real_HAT_GAN_SRx4.pth"
 
@@ -36,6 +35,7 @@ MAX_VALUES_BY_DTYPE = {
     np.dtype("float64").name: 1.0,
 }
 
+
 class UpscalerHAT(Upscaler):
     def __init__(self, dirname):
         self._cached_model = None
@@ -58,7 +58,7 @@ class UpscalerHAT(Upscaler):
 
     def do_upscale(self, img, model_file):
         use_compile = hasattr(opts, 'HAT_torch_compile') and opts.HAT_torch_compile \
-            and int(torch.__version__.split('.')[0]) >= 2 and platform.system() != "Windows"
+                      and int(torch.__version__.split('.')[0]) >= 2 and platform.system() != "Windows"
         current_config = (model_file, opts.HAT_tile)
 
         if use_compile and self._cached_model_config == current_config:
@@ -90,16 +90,14 @@ class UpscalerHAT(Upscaler):
             filename = path
 
         state_dict = torch.load(filename)
-        
+
         state_dict_keys = list(state_dict.keys())
 
         if "params_ema" in state_dict_keys:
             state_dict = state_dict["params_ema"]
         elif "params-ema" in state_dict_keys:
             state_dict = state_dict["params-ema"]
-        elif "params" in state_dict_keys:
-            state_dict = state_dict["params"]
-        
+
         model = HAT(state_dict=state_dict,
                     upscale=4,
                     in_chans=3,
@@ -110,14 +108,15 @@ class UpscalerHAT(Upscaler):
                     conv_scale=0.01,
                     overlap_ratio=0.5,
                     img_range=1.,
-                      depths=[6, 6, 6, 6, 6, 6],
-                      embed_dim=180,
-                      num_heads=[6, 6, 6, 6, 6, 6],
-                      mlp_ratio=2,
-                      upsampler='pixelshuffle',
-                      resi_connection='1conv')   
+                    depths=[6, 6, 6, 6, 6, 6],
+                    embed_dim=180,
+                    num_heads=[6, 6, 6, 6, 6, 6],
+                    mlp_ratio=2,
+                    upsampler='pixelshuffle',
+                    resi_connection='1conv')
 
         return model
+
 
 def as_3d(img: np.ndarray) -> np.ndarray:
     """Given a grayscale image, this returns an image with 3 dimensions (image.ndim == 3)."""
@@ -148,14 +147,14 @@ def norm(x: Tensor):
     """Normalize (z-norm) from [0,1] range to [-1,1]"""
     out = (x - 0.5) * 2.0
     return out.clamp(-1, 1)
-    
-    
+
+
 def np2tensor(
-    img: np.ndarray,
-    bgr2rgb=True,
-    normalize=False,
-    change_range=True,
-    add_batch=True,
+        img: np.ndarray,
+        bgr2rgb=True,
+        normalize=False,
+        change_range=True,
+        add_batch=True,
 ) -> Tensor:
     """Converts a numpy image array into a Tensor array.
     Parameters:
@@ -185,13 +184,13 @@ def np2tensor(
 
 
 def tensor2np(
-    img: Tensor,
-    rgb2bgr=True,
-    remove_batch=True,
-    data_range=255,
-    denormalize=False,
-    change_range=True,
-    imtype: Type = np.uint8,
+        img: Tensor,
+        rgb2bgr=True,
+        remove_batch=True,
+        data_range=255,
+        denormalize=False,
+        change_range=True,
+        imtype: Type = np.uint8,
 ) -> np.ndarray:
     """Converts a Tensor array into a numpy image array.
     Parameters:
@@ -235,7 +234,8 @@ def tensor2np(
 
     # has to be in range (0,255) before changing to np.uint8, else np.float32
     return img_np.astype(imtype)
-    
+
+
 def safe_cuda_cache_empty():
     """
     Empties the CUDA cache if CUDA is available. Hopefully without causing any errors.
@@ -245,7 +245,8 @@ def safe_cuda_cache_empty():
             torch.cuda.empty_cache()
     except:
         pass
-    
+
+
 def upscale_without_tiling(model, img):
     img = np.array(img)
     img_tensor = np2tensor(img, change_range=True)
@@ -253,33 +254,32 @@ def upscale_without_tiling(model, img):
     d_img = None
     try:
         d_img = img_tensor.to(device_hat, dtype=devices.dtype)
-        d_img = d_img.float()
 
         result = model(d_img)
         result = tensor2np(
-                result.detach().cpu().detach(),
-                change_range=False,
-                imtype=np.float32,
-            )
+            result.detach().cpu().detach(),
+            change_range=False,
+            imtype=np.float32,
+        )
 
         del d_img
         return Image.fromarray(result, 'RGB')
     except RuntimeError as e:
-            # Check to see if its actually the CUDA out of memory error
-            if "allocate" in str(e) or "CUDA" in str(e):
-                # Collect garbage (clear VRAM)
-                if d_img is not None:
-                    try:
-                        d_img.detach().cpu()
-                    except:
-                        pass
-                    del d_img
-                gc.collect()
-                safe_cuda_cache_empty()
-                return Split()
-            else:
-                # Re-raise the exception if not an OOM error
-                raise            
+        # Check to see if its actually the CUDA out of memory error
+        if "allocate" in str(e) or "CUDA" in str(e):
+            # Collect garbage (clear VRAM)
+            if d_img is not None:
+                try:
+                    d_img.detach().cpu()
+                except:
+                    pass
+                del d_img
+            gc.collect()
+            safe_cuda_cache_empty()
+            return Split()
+        else:
+            # Re-raise the exception if not an OOM error
+            raise
 
 
 def upscale(img, model):
@@ -301,7 +301,8 @@ def upscale(img, model):
             newrow.append([x * scale_factor, w * scale_factor, output])
         newtiles.append([y * scale_factor, h * scale_factor, newrow])
 
-    newgrid = images.Grid(newtiles, grid.tile_w * scale_factor, grid.tile_h * scale_factor, grid.image_w * scale_factor, grid.image_h * scale_factor, grid.overlap * scale_factor)
+    newgrid = images.Grid(newtiles, grid.tile_w * scale_factor, grid.tile_h * scale_factor, grid.image_w * scale_factor,
+                          grid.image_h * scale_factor, grid.overlap * scale_factor)
     output = images.combine_grid(newgrid)
     return output
 
@@ -309,10 +310,19 @@ def upscale(img, model):
 def on_ui_settings():
     import gradio as gr
 
-    shared.opts.add_option("HAT_tile", shared.OptionInfo(192, "Tile size for all HAT.", gr.Slider, {"minimum": 16, "maximum": 512, "step": 16}, section=('upscaling', "Upscaling")))
-    shared.opts.add_option("HAT_tile_overlap", shared.OptionInfo(8, "Tile overlap, in pixels for HAT. Low values = visible seam.", gr.Slider, {"minimum": 0, "maximum": 48, "step": 1}, section=('upscaling', "Upscaling")))
-    if int(torch.__version__.split('.')[0]) >= 2 and platform.system() != "Windows":    # torch.compile() require pytorch 2.0 or above, and not on Windows
-        shared.opts.add_option("HAT_torch_compile", shared.OptionInfo(False, "Use torch.compile to accelerate HAT.", gr.Checkbox, {"interactive": True}, section=('upscaling', "Upscaling")).info("Takes longer on first run"))
+    shared.opts.add_option("HAT_tile", shared.OptionInfo(192, "Tile size for all HAT.", gr.Slider,
+                                                         {"minimum": 16, "maximum": 512, "step": 16},
+                                                         section=('upscaling', "Upscaling")))
+    shared.opts.add_option("HAT_tile_overlap",
+                           shared.OptionInfo(8, "Tile overlap, in pixels for HAT. Low values = visible seam.",
+                                             gr.Slider, {"minimum": 0, "maximum": 48, "step": 1},
+                                             section=('upscaling', "Upscaling")))
+    if int(torch.__version__.split('.')[
+               0]) >= 2 and platform.system() != "Windows":  # torch.compile() require pytorch 2.0 or above, and not on Windows
+        shared.opts.add_option("HAT_torch_compile",
+                               shared.OptionInfo(False, "Use torch.compile to accelerate HAT.", gr.Checkbox,
+                                                 {"interactive": True}, section=('upscaling', "Upscaling")).info(
+                                   "Takes longer on first run"))
 
 
 script_callbacks.on_ui_settings(on_ui_settings)
