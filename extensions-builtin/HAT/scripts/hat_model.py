@@ -21,7 +21,7 @@ from modules import modelloader, devices, script_callbacks, shared, images
 from modules.shared import opts
 from modules.upscaler import Upscaler, UpscalerData
 
-HAT_MODEL_URL = "https://huggingface.co/datasets/dputilov/TTL/resolve/main/Real_HAT_GAN_SRx4.pth"
+HAT_MODEL_URL = "https://huggingface.co/datasets/dputilov/TTL/resolve/main/Real_HAT_GAN_sharper.pth"
 
 device_hat = devices.get_device_for('hat')
 
