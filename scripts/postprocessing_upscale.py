@@ -1,5 +1,6 @@
 from PIL import Image
 import numpy as np
+import math
 
 from modules import scripts_postprocessing, shared
 import gradio as gr
@@ -53,6 +54,32 @@ class ScriptPostprocessingUpscale(scripts_postprocessing.ScriptPostprocessing):
             "upscaler_2_name": extras_upscaler_2,
             "upscaler_2_visibility": extras_upscaler_2_visibility,
         }
+        
+    def get_factor(self, num):
+        if num == 1:
+            return 2
+        if num % 4 == 0:
+            return 4
+        if num % 3 == 0:
+            return 3
+        if num % 2 == 0:
+            return 2
+        return 0
+        
+    def get_factors(self, scale_factor):
+        scales = []
+        current_scale = 1
+        current_scale_factor = self.get_factor(scale_factor)
+        while current_scale_factor == 0:
+            scale_factor += 1
+            current_scale_factor = self.get_factor(scale_factor)
+        while current_scale < scale_factor:
+            current_scale_factor = self.get_factor(scale_factor // current_scale)
+            scales.append(current_scale_factor)
+            current_scale = current_scale * current_scale_factor
+            if current_scale_factor == 0:
+                break
+        return enumerate(scales)
 
     def upscale(self, image, info, upscaler, upscale_mode, upscale_by,  upscale_to_width, upscale_to_height, upscale_crop):
         if upscale_mode == 1:
@@ -67,7 +94,13 @@ class ScriptPostprocessingUpscale(scripts_postprocessing.ScriptPostprocessing):
         if cached_image is not None:
             image = cached_image
         else:
-            image = upscaler.scaler.upscale(image, upscale_by, upscaler.data_path)
+            scale_factor = math.ceil(max(upscale_to_width, upscale_to_height) / max(image.width, image.height))
+            scales = self.get_factors(scale_factor)
+            # Upscaling image over all factors
+            for index, value in scales:
+                print(f"Upscaling iteration {index+1} with scale factor {value}")
+                image = upscaler.scaler.upscale(image, value, upscaler.data_path)
+            image = image.resize((upscale_to_width, upscale_to_height), resample=Image.LANCZOS)
 
         upscale_cache[cache_key] = image
         if len(upscale_cache) > shared.opts.upscaling_max_images_in_cache:
