@@ -1427,7 +1427,7 @@ class StableDiffusionProcessingImg2Img(StableDiffusionProcessing):
             else:
                 image_mask = images.resize_image(self.resize_mode, image_mask, self.width, self.height)
                 np_mask = np.array(image_mask)
-                np_mask = np.clip((np_mask.astype(np.float32)) * 2, 0, 255).astype(np.uint8)
+                np_mask = np.clip((np_mask.astype(np.float32)), 0, 255).astype(np.uint8)
                 self.mask_for_overlay = Image.fromarray(np_mask)
 
             self.overlay_images = []
@@ -1528,7 +1528,7 @@ class StableDiffusionProcessingImg2Img(StableDiffusionProcessing):
         samples = self.sampler.sample_img2img(self, self.init_latent, x, conditioning, unconditional_conditioning, image_conditioning=self.image_conditioning)
 
         if self.mask is not None:
-            samples = samples + self.init_latent * self.mask
+            samples = samples * self.nmask + self.init_latent * self.mask
 
         del x
         devices.torch_gc()
