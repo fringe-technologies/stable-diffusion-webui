@@ -1452,7 +1452,7 @@ class StableDiffusionProcessingImg2Img(StableDiffusionProcessing):
 
             if image_mask is not None:
                 image_masked = Image.new('RGBa', (image.width, image.height))
-                image_masked.paste(image.convert("RGBA").convert("RGBa"))#, mask=ImageOps.invert(self.mask_for_overlay.convert('L')))
+                image_masked.paste(image.convert("RGBA").convert("RGBa")), mask=ImageOps.invert(self.mask_for_overlay.convert('L')))
 
                 self.overlay_images.append(image_masked.convert('RGBA'))
 
@@ -1527,8 +1527,8 @@ class StableDiffusionProcessingImg2Img(StableDiffusionProcessing):
 
         samples = self.sampler.sample_img2img(self, self.init_latent, x, conditioning, unconditional_conditioning, image_conditioning=self.image_conditioning)
 
-        if self.mask is not None:
-            samples = samples * self.nmask + self.init_latent * self.mask
+        #if self.mask is not None:
+        #    samples = samples * self.nmask + self.init_latent * self.mask
 
         del x
         devices.torch_gc()
