@@ -1527,8 +1527,8 @@ class StableDiffusionProcessingImg2Img(StableDiffusionProcessing):
 
         samples = self.sampler.sample_img2img(self, self.init_latent, x, conditioning, unconditional_conditioning, image_conditioning=self.image_conditioning)
 
-        #if self.mask is not None:
-        #    samples = samples * self.nmask + self.init_latent * self.mask
+        if self.mask is not None:
+            samples = samples + self.init_latent * self.mask
 
         del x
         devices.torch_gc()
