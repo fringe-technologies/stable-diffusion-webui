@@ -1452,7 +1452,7 @@ class StableDiffusionProcessingImg2Img(StableDiffusionProcessing):
 
             if image_mask is not None:
                 image_masked = Image.new('RGBa', (image.width, image.height))
-                #image_masked.paste(image.convert("RGBA").convert("RGBa"), mask=ImageOps.invert(self.mask_for_overlay.convert('L')))
+                image_masked.paste(image.convert("RGBA").convert("RGBa"), mask=ImageOps.invert(self.mask_for_overlay.convert('L')))
 
                 self.overlay_images.append(image_masked.convert('RGBA'))
 
