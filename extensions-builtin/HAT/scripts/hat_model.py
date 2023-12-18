@@ -149,7 +149,8 @@ def to_uint8(
 
 def upscale(
     img,
-    model
+    model,
+    tile = 192
 ):
     with torch.no_grad():
         use_fp16 = False
@@ -173,9 +174,9 @@ def upscale(
                 )
             return MaxTileSize()
 
-        upscale_tile_size = shared.opts.HAT_tile
+        upscale_tile_size = tile or shared.opts.HAT_tile
         img = np.array(img)
-        print(img.shape)
+
         img_out = pytorch_auto_split(
             img,
             model=model,
