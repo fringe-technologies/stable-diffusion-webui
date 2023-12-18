@@ -48,7 +48,7 @@ class UpscalerHAT(Upscaler):
     def do_upscale(self, img, model_file):
         use_compile = hasattr(opts, 'HAT_torch_compile') and opts.HAT_torch_compile \
                       and int(torch.__version__.split('.')[0]) >= 2 and platform.system() != "Windows"
-        current_config = (model_file, opts.HAT_tile)
+        current_config = (model_file, shared.opts.HAT_tile)
 
         if use_compile and self._cached_model_config == current_config:
             model = self._cached_model
