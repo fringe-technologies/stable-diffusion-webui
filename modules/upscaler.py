@@ -67,9 +67,12 @@ class Upscaler:
             if img.width >= dest_w and img.height >= dest_h:
                 break
 
-        if img.width != dest_w or img.height != dest_h:
-            img = img.resize((int(dest_w), int(dest_h)), resample=LANCZOS)
-
+        try:
+            if img.width != dest_w or img.height != dest_h:
+                img = img.resize((int(dest_w), int(dest_h)), resample=LANCZOS)
+        except:
+            return img
+            
         return img
 
     @abstractmethod
