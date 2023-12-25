@@ -31,7 +31,7 @@ class UpscalerHAT(Upscaler):
         self._cached_model_config = None
         self.name = "HAT"
         self.model_url = HAT_MODEL_URL
-        self.model_name = "HAT 4x"
+        self.model_name = "HAT_4x"
         self.user_path = dirname
         super().__init__()
         scalers = []
