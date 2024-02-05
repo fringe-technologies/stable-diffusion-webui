@@ -211,9 +211,10 @@ def estimate(model, img):
     element_size = 4
     model_bytes = sum(p.numel() * element_size for p in model.parameters())
     budget = int(free * 0.8)
-    
-    h, w = img.shape[:2]
-    c = 1 if img.ndim == 2 else img.shape[2]
+
+    image = np.array(img)
+    h, w = image.shape[:2]
+    c = 1 if image.ndim == 2 else image.shape[2]
     
     img_bytes = h * w * c * element_size
     mem_required_estimation = (model_bytes / (1024 * 52)) * img_bytes
