@@ -208,7 +208,7 @@ def upscale_without_tiling(model, img):
 def estimate(model, img):
     mem_info: Tuple[int, int] = torch.cuda.mem_get_info(devices.device_esrgan)
     free, _total = mem_info
-    element_size = 2 if use_fp16 else 4
+    element_size = 4
     model_bytes = sum(p.numel() * element_size for p in model.parameters())
     budget = int(free * 0.8)
     
