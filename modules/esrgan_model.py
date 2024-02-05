@@ -205,11 +205,47 @@ def upscale_without_tiling(model, img):
     return Image.fromarray(output, 'RGB')
 
 
+def estimate(model, img):
+    mem_info: Tuple[int, int] = torch.cuda.mem_get_info(devices.device_esrgan)
+    free, _total = mem_info
+    element_size = 2 if use_fp16 else 4
+    model_bytes = sum(p.numel() * element_size for p in model.parameters())
+    budget = int(free * 0.8)
+    
+    h, w = img.shape[:2]
+    c = 1 if img.ndim == 2 else img.shape[2]
+    
+    img_bytes = h * w * c * element_size
+    mem_required_estimation = (model_bytes / (1024 * 52)) * img_bytes
+
+    tile_pixels = w * h * budget / mem_required_estimation
+    # the largest power-of-2 tile_size such that tile_size**2 < tile_pixels
+    tile_size = 2 ** (int(tile_pixels**0.5).bit_length() - 1)
+
+    GB_AMT = 1024**3
+    required_mem = f"{mem_required_estimation/GB_AMT:.2f}"
+    budget_mem = f"{budget/GB_AMT:.2f}"
+    print(
+        f"Estimating memory required: {required_mem} GB, {budget_mem} GB free."
+        f" Estimated tile size: {tile_size}"
+    )
+
+    max_tile_size = max(w + 10, h + 10)
+    size = min(tile_size, max_tile_size)
+
+    return tile_size
+
+
 def esrgan_upscale(model, img):
     if opts.ESRGAN_tile == 0:
         return upscale_without_tiling(model, img)
 
-    grid = images.split_grid(img, opts.ESRGAN_tile, opts.ESRGAN_tile, opts.ESRGAN_tile_overlap)
+    print("ERSGAN_TILE = ", opts.ESRGAN_tile)
+
+    tile_size = estimate(model, img)
+    tile_overlap = 16
+    
+    grid = images.split_grid(img, tile_size, tile_size, tile_overlap)
     newtiles = []
     scale_factor = 1
 
