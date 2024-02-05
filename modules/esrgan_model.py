@@ -186,7 +186,6 @@ class UpscalerESRGAN(Upscaler):
         model = arch.RRDBNet(in_nc=in_nc, out_nc=out_nc, nf=nf, nb=nb, upscale=mscale, plus=plus)
         model.load_state_dict(state_dict)
         model.eval()
-        model.half()
 
         return model
 
@@ -195,7 +194,7 @@ def upscale_without_tiling(model, img):
     img = np.array(img)
     img = img[:, :, ::-1]
     img = np.ascontiguousarray(np.transpose(img, (2, 0, 1))) / 255
-    img = torch.from_numpy(img).half()
+    img = torch.from_numpy(img).float()
     img = img.unsqueeze(0).to(devices.device_esrgan)
     with torch.no_grad():
         output = model(img)
@@ -244,10 +243,10 @@ def esrgan_upscale(model, img):
 
     print("ERSGAN_TILE = ", opts.ESRGAN_tile)
 
-    tile_size = estimate(model, img)
-    tile_overlap = 64
+    #tile_size = estimate(model, img)
+    #tile_overlap = 64
     
-    grid = images.split_grid(img, tile_size, tile_size, tile_overlap)
+    grid = images.split_grid(img, opts.ESRGAN_tile, opts.ESRGAN_tile, opts.ESRGAN_overlap)
     newtiles = []
     scale_factor = 1
 
