@@ -174,7 +174,7 @@ def upscale(
                 )
             return MaxTileSize()
 
-        upscale_tile_size = tile or shared.opts.HAT_tile
+        upscale_tile_size = 0
         img = np.array(img)
 
         img_out = pytorch_auto_split(
