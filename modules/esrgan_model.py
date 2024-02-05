@@ -246,7 +246,7 @@ def esrgan_upscale(model, img):
     #tile_size = estimate(model, img)
     #tile_overlap = 64
     
-    grid = images.split_grid(img, opts.ESRGAN_tile, opts.ESRGAN_tile, opts.ESRGAN_overlap)
+    grid = images.split_grid(img, opts.ESRGAN_tile, opts.ESRGAN_tile, opts.ESRGAN_tile_overlap)
     newtiles = []
     scale_factor = 1
 
