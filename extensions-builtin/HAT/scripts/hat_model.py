@@ -157,7 +157,7 @@ def upscale(
         device = 'cuda:0'
 
         def estimate():
-            if "cuda" in device.type:
+            if "cuda" in device:
                 mem_info: Tuple[int, int] = torch.cuda.mem_get_info(device)
                 free, _total = mem_info
                 element_size = 2 if use_fp16 else 4
