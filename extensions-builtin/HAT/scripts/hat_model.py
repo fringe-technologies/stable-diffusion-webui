@@ -154,7 +154,7 @@ def upscale(
 ):
     with torch.no_grad():
         use_fp16 = False
-        device = 'cuda'
+        device = 'cuda:0'
 
         def estimate():
             if "cuda" in device.type:
