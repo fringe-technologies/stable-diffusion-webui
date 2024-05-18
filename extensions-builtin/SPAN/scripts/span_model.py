@@ -4,16 +4,15 @@ import sys
 import torch
 from PIL import Image
 
-from modules import devices, modelloader, script_callbacks, shared, upscaler_utils
-from modules.upscaler import Upscaler, UpscalerData
-from modules_forge.forge_util import prepare_free_memory
+import modules.upscaler
+from modules import devices, errors, modelloader, script_callbacks, shared, upscaler_utils
 
 SPAN_MODEL_URL = "https://huggingface.co/datasets/dputilov/TTL/resolve/main/4x-ClearRealityV1.pth"
 
 logger = logging.getLogger(__name__)
 
 
-class UpscalerSPAN(Upscaler):
+class UpscalerSPAN(modules.upscaler.Upscaler):
     def __init__(self, dirname):
         self._cached_model = None           # keep the model when SWIN_torch_compile is on to prevent re-compile every runs
         self._cached_model_config = None    # to clear '_cached_model' when changing model (v1/v2) or settings
@@ -29,13 +28,12 @@ class UpscalerSPAN(Upscaler):
                 name = self.model_name
             else:
                 name = modelloader.friendly_name(model)
-            model_data = UpscalerData(name, model, self)
+            model_data = modules.upscaler.UpscalerData(name, model, self)
             scalers.append(model_data)
         self.scalers = scalers
 
     def do_upscale(self, img: Image.Image, model_file: str) -> Image.Image:
-        prepare_free_memory()
-
+        devices.torch_gc()
         current_config = (model_file, shared.opts.SPAN_tile)
 
         if self._cached_model_config == current_config:

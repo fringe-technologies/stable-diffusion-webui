@@ -4,15 +4,15 @@ import sys
 import torch
 from PIL import Image
 
-from modules import devices, modelloader, script_callbacks, shared, upscaler_utils
-from modules.upscaler import Upscaler, UpscalerData
+import modules.upscaler
+from modules import devices, errors, modelloader, script_callbacks, shared, upscaler_utils
 
 HAT_MODEL_URL = "https://huggingface.co/datasets/dputilov/TTL/resolve/main/Real_HAT_GAN_sharper.pth"
 
 logger = logging.getLogger(__name__)
 
 
-class UpscalerHAT(Upscaler):
+class UpscalerHAT(modules.upscaler.Upscaler):
     def __init__(self, dirname):
         self._cached_model = None           
         self._cached_model_config = None    # to clear '_cached_model' when changing model (v1/v2) or settings
@@ -28,7 +28,7 @@ class UpscalerHAT(Upscaler):
                 name = self.model_name
             else:
                 name = modelloader.friendly_name(model)
-            model_data = UpscalerData(name, model, self)
+            model_data = modules.upscaler.UpscalerData(name, model, self)
             scalers.append(model_data)
         self.scalers = scalers
 
