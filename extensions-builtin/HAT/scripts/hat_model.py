@@ -71,7 +71,7 @@ class UpscalerHAT(modules.upscaler.Upscaler):
 
         model_descriptor = modelloader.load_spandrel_model(
             filename,
-            device=device = devices.get_device_for('hat'),
+            device= devices.get_device_for('hat'),
             prefer_half=(devices.dtype == torch.float16),
             expected_architecture="HAT",
         )
